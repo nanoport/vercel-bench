@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Play, Cpu, Clock, Zap, BarChart3, Server } from 'lucide-react';
+import { Play, Cpu, Clock, Zap, BarChart3, Server, MemoryStick } from 'lucide-react';
 import { benchmarks } from '@/lib/benchmarks';
 
 // Helper function to format numbers
@@ -63,7 +63,9 @@ export default function HomePage() {
   const [serverResults, setServerResults] = useState({});
   const [clientSystemInfo, setClientSystemInfo] = useState({});
   const [serverSystemInfo, setServerSystemInfo] = useState({});
-  
+  const [memIsRunning, setMemIsRunning] = useState(false);
+  const [memInfo, setMemInfo] = useState(null);
+
   useEffect(() => {
     setClientSystemInfo({
       userAgent: navigator.userAgent.substring(0, 40) + '...',
@@ -104,6 +106,20 @@ export default function HomePage() {
       setServerSystemInfo({ error: "Failed to fetch results from server." });
     }
     setServerIsRunning(false);
+  };
+
+  const checkMemory = async () => {
+    setMemIsRunning(true);
+    setMemInfo(null);
+    try {
+      const response = await fetch('/api/mem');
+      if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+      setMemInfo(await response.json());
+    } catch (error) {
+      console.error("Memory check failed:", error);
+      setMemInfo({ error: "Failed to fetch memory info from server." });
+    }
+    setMemIsRunning(false);
   };
 
   return (
@@ -156,6 +172,39 @@ export default function HomePage() {
         {/* Results Sections */}
         <BenchmarkResults title="Your CPU Results" results={clientResults} systemInfo={clientSystemInfo} icon={<BarChart3 className="w-6 h-6 mr-3 text-blue-600" />} />
         <BenchmarkResults title="Vercel CPU Results" results={serverResults} systemInfo={serverSystemInfo} icon={<Server className="w-6 h-6 mr-3 text-purple-600" />} />
+
+        {/* Memory Check */}
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200 mt-8">
+          <h2 className="text-2xl font-semibold mb-4 flex items-center">
+            <MemoryStick className="w-6 h-6 mr-3 text-green-600" />
+            Vercel Memory
+          </h2>
+          <p className="text-gray-600 mb-6">Check the memory limit and usage of the Vercel serverless function.</p>
+          <button
+            onClick={checkMemory}
+            disabled={memIsRunning}
+            className="w-full px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {memIsRunning ? <><Clock className="w-5 h-5 animate-spin" /><span>Checking...</span></> : <><MemoryStick className="w-5 h-5" /><span>Check Vercel Memory</span></>}
+          </button>
+
+          {memInfo && (
+            memInfo.error ? (
+              <p className="text-red-600 text-sm mt-4">{memInfo.error}</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-6 bg-gray-50 p-4 rounded-lg">
+                <div><span className="font-medium text-gray-700">Limit:</span><span className="ml-2 text-green-700 font-semibold">{memInfo.limitMB} MB</span></div>
+                <div><span className="font-medium text-gray-700">Total:</span><span className="ml-2 text-gray-600">{memInfo.totalmemMB} MB</span></div>
+                <div><span className="font-medium text-gray-700">Free:</span><span className="ml-2 text-gray-600">{memInfo.freememMB} MB</span></div>
+                <div><span className="font-medium text-gray-700">Region:</span><span className="ml-2 text-gray-600">{memInfo.region}</span></div>
+                <div><span className="font-medium text-gray-700">RSS:</span><span className="ml-2 text-gray-600">{Math.round(memInfo.usage.rss / 1e6)} MB</span></div>
+                <div><span className="font-medium text-gray-700">Heap Used:</span><span className="ml-2 text-gray-600">{Math.round(memInfo.usage.heapUsed / 1e6)} MB</span></div>
+                <div><span className="font-medium text-gray-700">Heap Total:</span><span className="ml-2 text-gray-600">{Math.round(memInfo.usage.heapTotal / 1e6)} MB</span></div>
+                <div><span className="font-medium text-gray-700">External:</span><span className="ml-2 text-gray-600">{Math.round(memInfo.usage.external / 1e6)} MB</span></div>
+              </div>
+            )
+          )}
+        </div>
 
       </div>
     </div>
