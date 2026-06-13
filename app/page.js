@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Play, Cpu, Clock, Zap, BarChart3, Server, MemoryStick } from 'lucide-react';
+import { Play, Cpu, Clock, Zap, BarChart3, Server, MemoryStick, HardDrive } from 'lucide-react';
 import { benchmarks } from '@/lib/benchmarks';
 
 // Helper function to format numbers
@@ -65,6 +65,8 @@ export default function HomePage() {
   const [serverSystemInfo, setServerSystemInfo] = useState({});
   const [memIsRunning, setMemIsRunning] = useState(false);
   const [memInfo, setMemInfo] = useState(null);
+  const [diskIsRunning, setDiskIsRunning] = useState(false);
+  const [diskInfo, setDiskInfo] = useState(null);
 
   useEffect(() => {
     setClientSystemInfo({
@@ -120,6 +122,20 @@ export default function HomePage() {
       setMemInfo({ error: "Failed to fetch memory info from server." });
     }
     setMemIsRunning(false);
+  };
+
+  const checkDisk = async () => {
+    setDiskIsRunning(true);
+    setDiskInfo(null);
+    try {
+      const response = await fetch('/api/disk');
+      if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+      setDiskInfo(await response.json());
+    } catch (error) {
+      console.error("Disk check failed:", error);
+      setDiskInfo({ error: "Failed to fetch disk info from server." });
+    }
+    setDiskIsRunning(false);
   };
 
   return (
@@ -201,6 +217,47 @@ export default function HomePage() {
                 <div><span className="font-medium text-gray-700">Heap Used:</span><span className="ml-2 text-gray-600">{Math.round(memInfo.usage.heapUsed / 1e6)} MB</span></div>
                 <div><span className="font-medium text-gray-700">Heap Total:</span><span className="ml-2 text-gray-600">{Math.round(memInfo.usage.heapTotal / 1e6)} MB</span></div>
                 <div><span className="font-medium text-gray-700">External:</span><span className="ml-2 text-gray-600">{Math.round(memInfo.usage.external / 1e6)} MB</span></div>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Disk Check */}
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200 mt-8">
+          <h2 className="text-2xl font-semibold mb-4 flex items-center">
+            <HardDrive className="w-6 h-6 mr-3 text-orange-600" />
+            Vercel Disk
+          </h2>
+          <p className="text-gray-600 mb-6">Check available disk space on the Vercel serverless function (/tmp is writable, /var/task is the deployment).</p>
+          <button
+            onClick={checkDisk}
+            disabled={diskIsRunning}
+            className="w-full px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all bg-orange-600 text-white hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {diskIsRunning ? <><Clock className="w-5 h-5 animate-spin" /><span>Checking...</span></> : <><HardDrive className="w-5 h-5" /><span>Check Vercel Disk</span></>}
+          </button>
+
+          {diskInfo && (
+            diskInfo.error ? (
+              <p className="text-red-600 text-sm mt-4">{diskInfo.error}</p>
+            ) : (
+              <div className="mt-6 space-y-4">
+                <div className="text-sm text-gray-600">Region: <span className="font-medium text-gray-700">{diskInfo.region}</span></div>
+                {[diskInfo.tmp, diskInfo.task].map((d) => (
+                  <div key={d.path} className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 mb-2">{d.path}</h3>
+                    {d.error ? (
+                      <p className="text-red-600 text-sm">{d.error}</p>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div><span className="font-medium text-gray-700">Total:</span><span className="ml-2 text-gray-600">{d.totalMB} MB</span></div>
+                        <div><span className="font-medium text-gray-700">Used:</span><span className="ml-2 text-orange-700 font-semibold">{d.usedMB} MB</span></div>
+                        <div><span className="font-medium text-gray-700">Free:</span><span className="ml-2 text-gray-600">{d.freeMB} MB</span></div>
+                        <div><span className="font-medium text-gray-700">Available:</span><span className="ml-2 text-gray-600">{d.availMB} MB</span></div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )
           )}
